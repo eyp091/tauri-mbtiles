@@ -41,7 +41,8 @@
         "../src/fonts",
         "../src/styles",
         "../src/tr12.mbtiles",
-        "../src/mapConfig.json"
+        "../src/mapConfig.json",
+        "../src/airplane.png"
       ]
   },
 

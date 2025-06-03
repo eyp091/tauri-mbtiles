@@ -1,41 +1,260 @@
 <!DOCTYPE html>
 <html lang="tr">
+
 <head>
   <meta charset="UTF-8" />
   <title>Harita Görüntüleyici</title>
 
-  <!-- MapLibre GL JS CSS -->
-  <link
-    href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css"
-    rel="stylesheet"
-  />
-
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.5.0/mapbox-gl-draw.css"
+    type="text/css">
+  <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.5.0/dist/maplibre-gl.css' />
+  <script src='https://unpkg.com/maplibre-gl@5.5.0/dist/maplibre-gl.js'></script>
   <style>
-    html, body, #map {
+    html,
+    body,
+    #map {
       margin: 0;
       padding: 0;
       width: 100%;
       height: 100vh;
     }
+
+    .toolbar {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      z-index: 30;
+      background: rgba(255, 255, 255, 0.97);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 12px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      min-width: 180px;
+      user-select: none;
+    }
+
+    .toolbar h3 {
+      margin: 0 0 8px 0;
+      font-size: 16px;
+      color: #333;
+      font-weight: 600;
+    }
+
+    .toolbar button,
+    .toolbar select {
+      padding: 6px 12px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      background: #f7f7f7;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .toolbar button.active {
+      background: #1976d2;
+      color: #fff;
+      border-color: #1976d2;
+    }
+
+    .toolbar button:hover:not(.active) {
+      background: #e3e3e3;
+    }
+
+    .measure-result {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      background: rgba(255, 255, 255, 0.97);
+      padding: 10px 18px;
+      border-radius: 6px;
+      font-size: 15px;
+      z-index: 40;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+      min-width: 160px;
+      text-align: center;
+      display: none;
+      pointer-events: none;
+    }
+
+    .marker-remove-btn {
+      background: #d32f2f;
+      color: #fff;
+      border: none;
+      border-radius: 3px;
+      padding: 2px 8px;
+      font-size: 12px;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+
+    .maplibregl-canvas {
+      cursor: default !important;
+    }
   </style>
 </head>
+
 <body>
   <div id="map"></div>
+  <div class="toolbar" id="toolbar">
+    <h3>Harita Araçları</h3>
+    <button id="marker-btn">Marker Ekle</button>
+    <button id="draw-line-btn">Çizgi Ölç</button>
+    <button id="draw-polygon-btn">Alan Ölç</button>
+    <button id="draw-point-btn">Nokta Çiz</button>
+    <button id="draw-trash-btn">Çizimleri Temizle</button>
+  </div>
+  <div id="measure-result" class="measure-result"></div>
 
-  <!-- MapLibre GL JS -->
-  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.12.0/mapbox-gl.js"></script>
+  <script>
+    window.mapboxgl = maplibregl;
+  </script>
+  <script src="https://api.mapbox.com/mapbox-gl-js/plugins/mapbox-gl-draw/v1.5.0/mapbox-gl-draw.js"></script>
+  <script src="https://unpkg.com/@turf/turf@6.5.0/turf.min.js"></script>
 
   <script>
-    const map = new maplibregl.Map({
-      container: 'map',
-      style: 'http://127.0.0.1:8081/styles/osm-bright/style.json',
-      center: [32.8, 39.9], // [longitude, latitude]
-      zoom: 6
-    });
+    document.addEventListener("DOMContentLoaded", () => {
+      // Harita başlat
+      const map = new maplibregl.Map({
+        container: 'map',
+        style: 'http://127.0.0.1:8081/styles/osm-bright/style.json',
+        center: [28.950, 41.000],
+        zoom: 10
+      });
 
-    map.on('load', () => {
-      console.log('Harita yüklendi.');
+      map.on('load', () => {
+        map.loadImage('./airplane.png', (error, image) => {
+          if (error) {
+            console.error('Airplane image yüklenemedi:', error);
+            return;
+          }
+          map.addImage('airplane-icon', image);
+
+          initializePlaneLayer();
+          animatePlaneAlongPath();
+        });
+      });
+
+      // Marker yönetimi
+      let markerMode = false;
+      let markers = [];
+
+
+      // Marker ekleme ve kaldırma
+      map.on('click', function (e) {
+        if (!markerMode) return;
+        const marker = new maplibregl.Marker({ color: "#d32f2f" })
+          .setLngLat([e.lngLat.lng, e.lngLat.lat])
+          .addTo(map);
+
+        // Popup içine kaldırma butonu
+        const popupDiv = document.createElement('div');
+        popupDiv.innerHTML = `<span>Marker</span> <button class="marker-remove-btn">Kaldır</button>`;
+        marker.setPopup(new maplibregl.Popup({ offset: 25 }).setDOMContent(popupDiv));
+        marker.getElement().addEventListener('mouseenter', () => marker.togglePopup());
+        marker.getElement().addEventListener('mouseleave', () => marker.togglePopup());
+
+        markers.push(marker);
+        popupDiv.querySelector('.marker-remove-btn').onclick = function (evt) {
+          evt.stopPropagation();
+          marker.remove();
+          markers = markers.filter(m => m !== marker);
+        };
+      });
+
+      // Çizim araçları (MapboxDraw, artık global olarak tanımlı)
+      // const draw = new MapboxDraw({
+      //   displayControlsDefault: false,
+      //   controls: {}
+      // });
+      // map.addControl(draw, 'top-left');
+
+      // Toolbar butonları
+      document.getElementById('marker-btn').onclick = function () {
+        markerMode = !markerMode;
+        this.classList.toggle('active', markerMode);
+        setActiveBtn(this, markerMode);
+        map.getCanvas().style.cursor = markerMode ? 'crosshair' : '';
+      };
+
+      // document.getElementById('draw-line-btn').onclick = function () {
+      //   draw.changeMode('draw_line_string');
+      //   setActiveBtn(this, true);
+      //   markerMode = false;
+      //   map.getCanvas().style.cursor = '';
+      // };
+      // document.getElementById('draw-polygon-btn').onclick = function () {
+      //   draw.changeMode('draw_polygon');
+      //   setActiveBtn(this, true);
+      //   markerMode = false;
+      //   map.getCanvas().style.cursor = '';
+      // };
+      // document.getElementById('draw-point-btn').onclick = function () {
+      //   draw.changeMode('draw_point');
+      //   setActiveBtn(this, true);
+      //   markerMode = false;
+      //   map.getCanvas().style.cursor = '';
+      // };
+      // document.getElementById('draw-trash-btn').onclick = function () {
+      //   draw.deleteAll();
+      //   showMeasureResult('');
+      //   setActiveBtn(null, false);
+      //   markerMode = false;
+      //   map.getCanvas().style.cursor = '';
+      // };
+
+      function setActiveBtn(btn, active) {
+        document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
+        if (btn && active) btn.classList.add('active');
+        if (!btn || btn.id !== 'marker-btn') markerMode = false;
+      }
+
+      // Ölçüm sonucu gösterimi
+      function showMeasureResult(text) {
+        const el = document.getElementById('measure-result');
+        if (text) {
+          el.style.display = 'block';
+          el.innerText = text;
+        } else {
+          el.style.display = 'none';
+          el.innerText = '';
+        }
+      }
+
+      // Ölçüm araçları: çizim tamamlanınca ölçüm yap
+      // map.on('draw.create', updateMeasurements);
+      // map.on('draw.update', updateMeasurements);
+      // map.on('draw.delete', () => showMeasureResult(''));
+
+      // function updateMeasurements() {
+      //   const data = draw.getAll();
+      //   let result = '';
+      //   if (data.features.length > 0) {
+      //     data.features.forEach(feature => {
+      //       if (feature.geometry.type === 'LineString') {
+      //         const length = turf.length(feature, { units: 'kilometers' });
+      //         result += 'Çizgi uzunluğu: ' + length.toFixed(2) + ' km\n';
+      //       }
+      //       if (feature.geometry.type === 'Polygon') {
+      //         const area = turf.area(feature);
+      //         result += 'Alan: ' + area.toFixed(0) + ' m²\n';
+      //       }
+      //     });
+      //   }
+      //   showMeasureResult(result.trim());
+      // }
+
+      map.on('load', () => {
+        // Araç çubuğu ve ölçüm kutusu görünür olsun
+        document.getElementById('toolbar').style.display = 'flex';
+        document.getElementById('measure-result').style.display = 'none';
+      });
     });
   </script>
 </body>
+
 </html>
