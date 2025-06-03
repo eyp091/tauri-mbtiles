@@ -139,114 +139,126 @@
         });
       });
 
-      // Marker yönetimi
-      let markerMode = false;
-      let markers = [];
+      // #region Marker animasyonu
+      const pathCoordinates = [
+        // 1. Avrupa yakası – Hasköy (Eyüp) çevresi
+        [28.916, 41.038],
+        [28.918, 41.040],
+        [28.920, 41.042],
+        // 2. Aşağı doğru – Balat yönüne meyilli (Golden Horn boyunca)
+        [28.923, 41.041],
+        [28.927, 41.039],
+        [28.930, 41.037],
+        [28.933, 41.035],
+        // 3. Tekrar yukarı – Karaköy/Beyoğlu hattına doğru
+        [28.937, 41.037],
+        [28.940, 41.039],
+        [28.943, 41.042],
+        // 4. Boğaza yaklaşırken ufak bir sol dönüş
+        [28.948, 41.044],
+        [28.952, 41.046],
+        // 5. Boğazı geçme bölgesi – Galata Köprüsü yönü
+        [28.958, 41.048],
+        [28.963, 41.049],
+        [28.968, 41.050],
+        // 6. Asya’ya geçerken kısa bir batıya yönelme (Üsküdar’a inerken)
+        [28.974, 41.052],
+        [28.980, 41.054],
+        // 7. Tekrar kuzeye dönerek Beylerbeyi yönüne sapma
+        [28.986, 41.056],
+        [28.990, 41.058],
+        [28.994, 41.059],
+        // 8. Hemen ardından güneye doğru – Kuzguncuk sınırı
+        [28.997, 41.056],
+        [28.999, 41.054],
+        // 9. Çengelköy’e meyilli küçük bir kuzey yönelme
+        [29.002, 41.057],
+        [29.006, 41.059],
+        // 10. Çengelköy’den geri dönerek Üsküdar merkez
+        [29.009, 41.056],
+        [29.012, 41.054],
+        [29.015, 41.052],
+        // 11. Kadıköy’e doğru son dönüşler
+        [29.019, 41.055],
+        [29.023, 41.058],
+        [29.027, 41.060],
+        [29.030, 41.062],
+        // 12. Son olarak Kurtuluş/Kadıköy civarı
+        [29.034, 41.061],
+        [29.038, 41.059]
+      ];
 
+      let currentIndex = 0;
+      const totalPoints = pathCoordinates.length;
 
-      // Marker ekleme ve kaldırma
-      map.on('click', function (e) {
-        if (!markerMode) return;
-        const marker = new maplibregl.Marker({ color: "#d32f2f" })
-          .setLngLat([e.lngLat.lng, e.lngLat.lat])
-          .addTo(map);
+      const img = document.createElement("img");
+      img.src = './airplane.png';
+      img.style.width = '32px';
+      img.style.height = '32px';
+      img.style.transformOrigin = '50% 50%';
+      img.style.transform = 'translate(-50%, -50%)';
+      img.style.cursor = 'pointer';
 
-        // Popup içine kaldırma butonu
-        const popupDiv = document.createElement('div');
-        popupDiv.innerHTML = `<span>Marker</span> <button class="marker-remove-btn">Kaldır</button>`;
-        marker.setPopup(new maplibregl.Popup({ offset: 25 }).setDOMContent(popupDiv));
-        marker.getElement().addEventListener('mouseenter', () => marker.togglePopup());
-        marker.getElement().addEventListener('mouseleave', () => marker.togglePopup());
+      const marker = new maplibregl.Marker({ element: img })
+        .setLngLat(pathCoordinates[0])
+        .addTo(map);
 
-        markers.push(marker);
-        popupDiv.querySelector('.marker-remove-btn').onclick = function (evt) {
-          evt.stopPropagation();
-          marker.remove();
-          markers = markers.filter(m => m !== marker);
-        };
-      });
-
-      // Çizim araçları (MapboxDraw, artık global olarak tanımlı)
-      // const draw = new MapboxDraw({
-      //   displayControlsDefault: false,
-      //   controls: {}
-      // });
-      // map.addControl(draw, 'top-left');
-
-      // Toolbar butonları
-      document.getElementById('marker-btn').onclick = function () {
-        markerMode = !markerMode;
-        this.classList.toggle('active', markerMode);
-        setActiveBtn(this, markerMode);
-        map.getCanvas().style.cursor = markerMode ? 'crosshair' : '';
-      };
-
-      // document.getElementById('draw-line-btn').onclick = function () {
-      //   draw.changeMode('draw_line_string');
-      //   setActiveBtn(this, true);
-      //   markerMode = false;
-      //   map.getCanvas().style.cursor = '';
-      // };
-      // document.getElementById('draw-polygon-btn').onclick = function () {
-      //   draw.changeMode('draw_polygon');
-      //   setActiveBtn(this, true);
-      //   markerMode = false;
-      //   map.getCanvas().style.cursor = '';
-      // };
-      // document.getElementById('draw-point-btn').onclick = function () {
-      //   draw.changeMode('draw_point');
-      //   setActiveBtn(this, true);
-      //   markerMode = false;
-      //   map.getCanvas().style.cursor = '';
-      // };
-      // document.getElementById('draw-trash-btn').onclick = function () {
-      //   draw.deleteAll();
-      //   showMeasureResult('');
-      //   setActiveBtn(null, false);
-      //   markerMode = false;
-      //   map.getCanvas().style.cursor = '';
-      // };
-
-      function setActiveBtn(btn, active) {
-        document.querySelectorAll('.toolbar button').forEach(b => b.classList.remove('active'));
-        if (btn && active) btn.classList.add('active');
-        if (!btn || btn.id !== 'marker-btn') markerMode = false;
+      function computeBearing(start, end) {
+        const [lng1, lat1] = start.map((d) => (d * Math.PI) / 180);
+        const [lng2, lat2] = end.map((d) => (d * Math.PI) / 180);
+        const dLng = lng2 - lng1;
+        const y = Math.sin(dLng) * Math.cos(lat2);
+        const x =
+          Math.cos(lat1) * Math.sin(lat2) -
+          Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
+        let brng = Math.atan2(y, x);
+        brng = (brng * 180) / Math.PI;
+        return (brng + 360) % 360;
       }
 
-      // Ölçüm sonucu gösterimi
-      function showMeasureResult(text) {
-        const el = document.getElementById('measure-result');
-        if (text) {
-          el.style.display = 'block';
-          el.innerText = text;
-        } else {
-          el.style.display = 'none';
-          el.innerText = '';
+      function animateSegment(from, to, durationMs, onComplete) {
+        const startTime = performance.now();
+        const [lng1, lat1] = from;
+        const [lng2, lat2] = to;
+
+        const bearing = computeBearing(from, to);
+        img.style.transform = 'translate(-50%, -50%) rotate(' + bearing.toFixed(1) + 'deg)';
+
+        function frame(now) {
+          const elapsed = now - startTime;
+          const t = Math.min(elapsed / durationMs, 1); // 0 ≤ t ≤ 1
+
+          const currentLng = lng1 + (lng2 - lng1) * t;
+          const currentLat = lat1 + (lat2 - lat1) * t;
+
+          marker.setLngLat([currentLng, currentLat]);
+
+          if (t < 1) {
+            requestAnimationFrame(frame);
+          } else {
+            if (typeof onComplete === 'function') {
+              onComplete();
+            }
+          }
         }
+        requestAnimationFrame(frame);
       }
 
-      // Ölçüm araçları: çizim tamamlanınca ölçüm yap
-      // map.on('draw.create', updateMeasurements);
-      // map.on('draw.update', updateMeasurements);
-      // map.on('draw.delete', () => showMeasureResult(''));
+      function animateToNext() {
+        if (currentIndex + 1 >= totalPoints) {
+          return; // Bitti
+        }
+        const from = pathCoordinates[currentIndex];
+        const to = pathCoordinates[currentIndex + 1];
 
-      // function updateMeasurements() {
-      //   const data = draw.getAll();
-      //   let result = '';
-      //   if (data.features.length > 0) {
-      //     data.features.forEach(feature => {
-      //       if (feature.geometry.type === 'LineString') {
-      //         const length = turf.length(feature, { units: 'kilometers' });
-      //         result += 'Çizgi uzunluğu: ' + length.toFixed(2) + ' km\n';
-      //       }
-      //       if (feature.geometry.type === 'Polygon') {
-      //         const area = turf.area(feature);
-      //         result += 'Alan: ' + area.toFixed(0) + ' m²\n';
-      //       }
-      //     });
-      //   }
-      //   showMeasureResult(result.trim());
-      // }
+        animateSegment(from, to, 800, () => {
+          currentIndex++;
+          animateToNext();
+        });
+      }
+      animateToNext();
+
+      // #endregion
 
       map.on('load', () => {
         // Araç çubuğu ve ölçüm kutusu görünür olsun
