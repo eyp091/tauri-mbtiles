@@ -37,11 +37,12 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "resources": [
-      "../tr12.mbtiles",
-      "../src/styles",
-      "../src/fonts"
-    ]
+      "resources": [
+        "../src/fonts",
+        "../src/styles",
+        "../src/tr12.mbtiles",
+        "../src/mapConfig.json"
+      ]
   },
 
   "plugins": {}
