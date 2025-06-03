@@ -1,0 +1,28 @@
+{
+  "options": {
+    "paths": {
+      "fonts": "../../map_config/fonts",
+      "styles": "../../map_config/styles"
+    }
+  },
+  "styles": {
+    "test-style": {
+      "style": "osm-bright/style.json",
+      "tilejson": {
+        "type": "overlay"
+      }
+    },
+    "klokantech-basic": {
+      "style": "klokantech-basic/style.json",
+      "tilejson": {
+        "type": "overlay",
+        "bounds": [8.529446, 47.364758, 8.55232, 47.380539]
+      }
+    }
+  },
+  "data": {
+    "openmaptiles": {
+      "mbtiles": "../../map_config/data/extra/tr-gr-bul.mbtiles"
+    }
+  }
+}

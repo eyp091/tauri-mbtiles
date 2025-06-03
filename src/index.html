@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Harita Görüntüleyici</title>
+
+  <!-- MapLibre GL JS CSS -->
+  <link
+    href="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.css"
+    rel="stylesheet"
+  />
+
+  <style>
+    html, body, #map {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+
+  <!-- MapLibre GL JS -->
+  <script src="https://unpkg.com/maplibre-gl@latest/dist/maplibre-gl.js"></script>
+
+  <script>
+    const map = new maplibregl.Map({
+      container: 'map',
+      style: 'http://127.0.0.1:8081/styles/osm-bright/style.json',
+      center: [32.8, 39.9], // [longitude, latitude]
+      zoom: 6
+    });
+
+    map.on('load', () => {
+      console.log('Harita yüklendi.');
+    });
+  </script>
+</body>
+</html>
