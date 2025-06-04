@@ -3,52 +3,83 @@
 
 <head>
   <meta charset="UTF-8" />
-  <title>Harita Görüntüleyici</title>
+  <title>Excel'den Marker Simülasyonu</title>
   <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@5.5.0/dist/maplibre-gl.css' />
   <script src='https://unpkg.com/maplibre-gl@5.5.0/dist/maplibre-gl.js'></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <style>
     html,
-    body,
-    #map {
+    body {
+      height: 100%;
       margin: 0;
       padding: 0;
-      width: 100%;
+      width: 100vw;
+      min-height: 100vh;
+      min-width: 100vw;
+      overflow: hidden;
+    }
+
+    body {
+      width: 100vw;
       height: 100vh;
+      min-height: 100vh;
+      min-width: 100vw;
+      overflow: hidden;
     }
 
-    .airplane-marker,
-    .airplane2-marker {
-      width: 32px;
-      height: 32px;
-      transform: translate(-50%, -50%);
-      will-change: transform;
-      pointer-events: none;
-      user-select: none;
-      display: block;
+    .container {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+      min-height: 100vh;
+      min-width: 100vw;
     }
 
-    .control-panel {
-      position: absolute;
-      top: 24px;
-      right: 32px;
-      z-index: 20;
-      background: rgba(255, 255, 255, 0.97);
-      border-radius: 10px;
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      padding: 18px 22px 16px 22px;
-      min-width: 200px;
+    .left-panel {
+      flex: 1 1 0;
+      height: 100vh;
+      min-width: 0;
+      position: relative;
+    }
+
+    .right-panel {
+      width: 350px;
+      max-width: 100vw;
+      min-width: 320px;
+      height: 100vh;
+      background: #f7f7f7;
       display: flex;
       flex-direction: column;
       align-items: center;
-      gap: 10px;
+      justify-content: flex-start;
+      padding: 24px 12px 0 12px;
+      box-sizing: border-box;
+      overflow-y: auto;
+    }
+
+    #map {
+      width: 100%;
+      height: 100vh;
+      min-height: 100vh;
+      min-width: 0;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+
+    .file-input {
+      margin-bottom: 18px;
+      width: 100%;
+      text-align: center;
     }
 
     .control-panel-title {
-      font-size: 17px;
+      font-size: 18px;
       font-weight: 700;
-      margin-bottom: 10px;
+      margin-bottom: 12px;
       color: #1976d2;
       letter-spacing: 1px;
+      text-align: center;
     }
 
     .control-panel-grid {
@@ -57,6 +88,7 @@
       grid-template-rows: 1fr 1fr 1fr;
       gap: 10px;
       width: 100%;
+      margin-bottom: 16px;
     }
 
     .control-panel button {
@@ -77,374 +109,356 @@
       border-color: #1976d2;
     }
 
-    .control-panel button:active {
-      background: #1976d2;
-      color: #fff;
-      border-color: #1976d2;
+    .timer-info {
+      margin-top: 18px;
+      font-size: 15px;
+      color: #333;
+      text-align: center;
+      width: 100%;
     }
 
-    .temperature-info {
-      margin-top: 10px;
-      font-size: 16px;
-      font-weight: 600;
-      color: #d32f2f;
-      letter-spacing: 1px;
-      text-align: center;
+    .airplane-front-container {
+      margin-top: 100px;
+      width: 320px;
+      height: 320px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px #0001;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    #airplane-front {
+      width: 300px;
+      height: 300px;
+      object-fit: contain;
+      transition: transform 0.2s cubic-bezier(.4, 2, .6, 1);
+      will-change: transform;
+      display: block;
+    }
+
+    @media (max-width: 700px) {
+      .right-panel {
+        min-width: 0;
+        width: 100vw;
+        height: auto;
+        position: static;
+      }
+
+      .container {
+        flex-direction: column;
+      }
+
+      .left-panel {
+        height: 50vh;
+      }
+
+      #map {
+        height: 50vh;
+      }
     }
   </style>
 </head>
 
 <body>
-  <div id="map"></div>
-  <div class="control-panel">
-    <div class="control-panel-title">Control Panel</div>
-    <div class="control-panel-grid">
-      <button id="startBtn">Start</button>
-      <button id="stopBtn">Stop</button>
-      <button id="continueBtn">Continue</button>
-      <button id="restartBtn">Restart</button>
-      <button id="speed1Btn" class="active">1x</button>
-      <button id="speed2Btn">2x</button>
+  <div class="container">
+    <div class="left-panel">
+      <div id="map"></div>
     </div>
-    <div class="temperature-info">
-      Sıcaklık: <span id="temperature-value">-</span>°C
+    <div class="right-panel">
+      <div class="file-input">
+        <input type="file" id="excelFile" accept=".xlsx,.xls" />
+      </div>
+      <div class="control-panel-title">Control Panel</div>
+      <div class="control-panel-grid control-panel">
+        <button id="startBtn">Start</button>
+        <button id="stopBtn">Stop</button>
+        <button id="continueBtn">Continue</button>
+        <button id="restartBtn">Restart</button>
+        <button id="speed1Btn" class="active">1x</button>
+        <button id="speed2Btn">2x</button>
+      </div>
+      <div class="timer-info">
+        Zaman: <span id="timer-value">-</span>
+      </div>
+      <div class="airplane-front-container">
+        <img id="airplane-front" src="airplane-front.png" alt="airplane front" />
+      </div>
     </div>
   </div>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      const map = new maplibregl.Map({
-        container: 'map',
-        style: 'http://127.0.0.1:8081/styles/osm-bright/style.json',
-        center: [28.950, 41.000],
-        zoom: 10
-      });
+    // --- Global Variables ---
+    let latArr = [],
+      lngArr = [],
+      epochArr = [],
+      yawArr = [],
+      pitchArr = [],
+      rollArr = [];
+    let marker = null,
+      img = null,
+      map = null;
+    let currentIndex = 0;
+    let isPaused = false;
+    let speed = 1;
+    let passedCoords = [];
+    let moveTimeout = null;
+    let flightPathInitialized = false;
+    let lastBearing = 0;
 
-      // Sıcaklık değerleri ve renkleri
-      const temperatureSteps = [
-        { value: 10, color: "#2196f3" }, // Mavi
-        { value: 18, color: "#4caf50" }, // Yeşil
-        { value: 24, color: "#ffeb3b" }, // Sarı
-        { value: 30, color: "#ff9800" }, // Turuncu
-        { value: 36, color: "#d32f2f" }  // Kırmızı
-      ];
+    // --- Excel Okuma ---
+    document.getElementById('excelFile').addEventListener('change', function (e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = function (evt) {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheet = workbook.Sheets[workbook.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false });
+        // Başlıkları bul
+        const headers = json[0].map(h => h.toString().trim().toLowerCase());
+        const idx_lat = headers.findIndex(h => h.includes('lat'));
+        const idx_lng = headers.findIndex(h => h.includes('long'));
+        const idx_epoch = headers.findIndex(h => h.includes('epoch_time'));
+        const idx_yaw = headers.findIndex(h => h.includes('yaw'));
+        const idx_pitch = headers.findIndex(h => h.includes('pitch'));
+        const idx_roll = headers.findIndex(h => h.includes('roll'));
+        // Dizileri temizle
+        latArr = [];
+        lngArr = [];
+        epochArr = [];
+        yawArr = [];
+        pitchArr = [];
+        rollArr = [];
+        for (let i = 1; i < json.length; i++) {
+          const row = json[i];
+          if (!row[idx_lat] || !row[idx_lng]) continue;
+          latArr.push(parseFloat(row[idx_lat].replace(',', '.')));
+          lngArr.push(parseFloat(row[idx_lng].replace(',', '.')));
+          epochArr.push(parseFloat(row[idx_epoch].toString().replace(',', '.')));
+          yawArr.push(idx_yaw !== -1 && row[idx_yaw] ? parseFloat(row[idx_yaw].toString().replace(',', '.')) : 0);
+          pitchArr.push(idx_pitch !== -1 && row[idx_pitch] ? parseFloat(row[idx_pitch].toString().replace(',', '.')) : 0);
+          rollArr.push(idx_roll !== -1 && row[idx_roll] ? parseFloat(row[idx_roll].toString().replace(',', '.')) : 0);
+        }
+        if (latArr.length > 0) {
+          initializeMapAndMarker();
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
 
-      function getTemperatureForIndex(idx) {
-        return temperatureSteps[idx % temperatureSteps.length];
-      }
+    // --- Harita ve Marker Kurulumu (Sadece 1 kez) ---
+    function initializeMapAndMarker() {
+      if (!map) {
+        map = new maplibregl.Map({
+          container: 'map',
+          style: 'http://127.0.0.1:8081/styles/osm-bright/style.json',
+          center: [lngArr[0], latArr[0]],
+          zoom: 13
+        });
+        map.on('load', () => {
+          // Marker
+          img = document.createElement("img");
+          img.src = 'tb2.png';
+          img.className = 'airplane-marker';
+          img.style.width = "45px";
+          img.style.height = "45px";
+          img.style.objectFit = "contain";
+          img.style.transition = 'none';
+          marker = new maplibregl.Marker({
+              element: img,
+              rotationAlignment: 'map'
+            })
+            .setLngLat([lngArr[0], latArr[0]])
+            .addTo(map);
 
-      // Birinci marker'ın path'i
-      const pathCoordinates1 = [
-        [28.916, 41.038], [28.918, 41.040], [28.920, 41.042], [28.923, 41.041], [28.927, 41.039],
-        [28.930, 41.037], [28.933, 41.035], [28.935, 41.033], [28.937, 41.031], [28.940, 41.029],
-        [28.943, 41.027], [28.945, 41.025], [28.947, 41.023], [28.949, 41.024], [28.951, 41.026],
-        [28.953, 41.028], [28.955, 41.030], [28.957, 41.032], [28.959, 41.034], [28.961, 41.036],
-        // Aşağıya doğru, Üsküdar’a yanaşma
-        [28.963, 41.037], [28.965, 41.038], [28.967, 41.039], [28.969, 41.040], [28.971, 41.041],
-        [28.973, 41.042], [28.975, 41.043], [28.977, 41.044], [28.979, 41.045], [28.981, 41.046],
-        [28.983, 41.047], [28.985, 41.048], [28.987, 41.049], [28.989, 41.050], [28.991, 41.051],
-        [28.993, 41.052], [28.995, 41.053], [28.997, 41.054], [28.999, 41.055], [29.001, 41.056],
-        [29.003, 41.057], [29.005, 41.058], [29.007, 41.059], [29.009, 41.060], [29.011, 41.061],
-        [29.013, 41.062], [29.015, 41.063], [29.017, 41.064], [29.019, 41.065], [29.021, 41.066],
-        [29.023, 41.067], [29.025, 41.068], [29.027, 41.069], [29.029, 41.070], [29.031, 41.071],
-        [29.033, 41.072], [29.035, 41.073], [29.037, 41.074], [29.039, 41.075], [29.041, 41.076]
-      ];
-      const totalPoints1 = pathCoordinates1.length;
-
-      // İkinci marker'ın path'i
-      const pathCoordinates2 = [
-        [29.001, 41.038], [29.003, 41.040], [29.005, 41.042], [29.007, 41.041], [29.009, 41.039],
-        [29.011, 41.037], [29.013, 41.035], [29.015, 41.033], [29.017, 41.031], [29.019, 41.029],
-        [29.021, 41.027], [29.023, 41.025], [29.025, 41.023], [29.027, 41.024], [29.029, 41.026],
-        [29.031, 41.028], [29.033, 41.030], [29.035, 41.032], [29.037, 41.034], [29.039, 41.036],
-        // Aşağıya doğru Pendik yönü
-        [29.041, 41.035], [29.043, 41.034], [29.045, 41.033], [29.047, 41.032], [29.049, 41.031],
-        [29.051, 41.030], [29.053, 41.029], [29.055, 41.028], [29.057, 41.027], [29.059, 41.026],
-        [29.061, 41.025], [29.063, 41.024], [29.065, 41.023], [29.067, 41.022], [29.069, 41.021],
-        [29.071, 41.020], [29.073, 41.019], [29.075, 41.018], [29.077, 41.017], [29.079, 41.016],
-        [29.081, 41.015], [29.083, 41.014], [29.085, 41.013], [29.087, 41.012], [29.089, 41.011],
-        [29.091, 41.010], [29.093, 41.009], [29.095, 41.008], [29.097, 41.007], [29.099, 41.006],
-        [29.101, 41.005], [29.103, 41.004], [29.105, 41.003], [29.107, 41.002], [29.109, 41.001],
-        [29.111, 41.000], [29.113, 40.999], [29.115, 40.998], [29.117, 40.997], [29.119, 40.996],
-        [29.121, 40.995], [29.123, 40.994], [29.125, 40.993], [29.127, 40.992], [29.129, 40.991]
-      ];
-
-      const totalPoints2 = pathCoordinates2.length;
-
-      // Ortak state'ler
-      let marker1, img1, marker2, img2;
-      let currentIndex1 = 0,
-        currentIndex2 = 0;
-      let segmentStart1 = null,
-        segmentStart2 = null;
-      let segmentBearing1 = 0,
-        segmentBearing2 = 0;
-      let animationFrameId = null;
-      let isPaused = false;
-      let pausedTimestamp = null;
-      let passedCoords1 = [],
-        passedCoords2 = [];
-      let speed = 1;
-
-      // Çoklu renkli çizgi için dinamik layer (her marker için ayrı)
-      function updatePassedLine(markerNum) {
-        const passedCoords = markerNum === 1 ? passedCoords1 : passedCoords2;
-        const sourceId = markerNum === 1 ? 'passed-line-1' : 'passed-line-2';
-        const features = [];
-        for (let i = 1; i < passedCoords.length; i++) {
-          features.push({
+          // Çizgi
+          if (!map.getSource('flight-path')) {
+            map.addSource('flight-path', {
+              type: 'geojson',
+              data: {
+                type: 'Feature',
+                geometry: {
+                  type: 'LineString',
+                  coordinates: [[lngArr[0], latArr[0]]]
+                }
+              }
+            });
+            map.addLayer({
+              id: 'flight-path-layer',
+              type: 'line',
+              source: 'flight-path',
+              paint: {
+                'line-color': '#d32f2f',
+                'line-width': 3
+              }
+            });
+          }
+          passedCoords = [[lngArr[0], latArr[0]]];
+          currentIndex = 0;
+          updateTimerInfo(0);
+          flightPathInitialized = true;
+        });
+      } else {
+        // Sadece marker ve çizgi konumunu güncelle
+        marker.setLngLat([lngArr[0], latArr[0]]);
+        // marker.setRotation(0); // <-- Bunu kaldır!
+        lastBearing = 0; // Başlangıçta sıfırla
+        passedCoords = [[lngArr[0], latArr[0]]];
+        if (map.getSource('flight-path')) {
+          map.getSource('flight-path').setData({
             type: 'Feature',
             geometry: {
               type: 'LineString',
-              coordinates: [passedCoords[i - 1], passedCoords[i]]
-            },
-            properties: {
-              color: getTemperatureForIndex(i - 1).color
+              coordinates: passedCoords
             }
           });
         }
-        map.getSource(sourceId).setData({
-          type: 'FeatureCollection',
-          features
-        });
+        currentIndex = 0;
+        updateTimerInfo(0);
+      }
+    }
+
+    // --- Marker animasyonu sırasında airplane-front.png'yi güncelle ---
+    function updateAirplaneFront(idx) {
+      const airplane = document.getElementById('airplane-front');
+      if (!airplane) return;
+      // Yaw: Z ekseni, Pitch: X ekseni, Roll: Y ekseni
+      // Yaw'ı görselde göstermek genelde gerekmez, ama istersen ekleyebilirsin.
+      const yaw = yawArr[idx] || 0;
+      const pitch = pitchArr[idx] || 0;
+      const roll = rollArr[idx] || 0;
+      // CSS'de: rotateZ(yaw), rotateX(pitch), rotateY(roll)
+      // Genelde uçak burun görseli için: roll (sağa/sola yatış), pitch (yukarı/aşağı), yaw (dönüş)
+      airplane.style.transform = `
+    rotateZ(${yaw}deg)
+    rotateX(${-pitch}deg)
+    rotateY(${-roll}deg)
+  `;
+    }
+
+    // --- Animasyon (zaman bazlı, adım adım ilerleme) ---
+    function moveMarkerByEpoch() {
+      if (moveTimeout) clearTimeout(moveTimeout);
+      if (currentIndex >= latArr.length - 1) return;
+
+      marker.setLngLat([lngArr[currentIndex], latArr[currentIndex]]);
+      const prev = [latArr[currentIndex], lngArr[currentIndex]];
+      const next = [latArr[currentIndex + 1], lngArr[currentIndex + 1]];
+      const distance = Math.abs(prev[0] - next[0]) + Math.abs(prev[1] - next[1]);
+      if (distance > 0.00001) {
+        const bearing = getBearing(
+          latArr[currentIndex], lngArr[currentIndex],
+          latArr[currentIndex + 1], lngArr[currentIndex + 1]
+        );
+        marker.setRotation(bearing);
+        lastBearing = bearing;
       }
 
-      // Layer'ı çoklu renkli çizgiye uygun hale getir (her marker için ayrı)
-      function addPassedLineLayer(markerNum) {
-        const sourceId = markerNum === 1 ? 'passed-line-1' : 'passed-line-2';
-        const layerId = markerNum === 1 ? 'passed-line-layer-1' : 'passed-line-layer-2';
-        map.addSource(sourceId, {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: []
+      passedCoords.push([lngArr[currentIndex], latArr[currentIndex]]);
+      updateFlightPath();
+      updateTimerInfo(currentIndex);
+      updateAirplaneFront(currentIndex);
+
+      currentIndex++;
+      if (!isPaused && currentIndex < latArr.length) {
+        const delay = Math.max((epochArr[currentIndex] - epochArr[currentIndex - 1]) / speed, 0.01) * 1000;
+        moveTimeout = setTimeout(moveMarkerByEpoch, delay);
+      }
+    }
+
+    // --- Bearing Hesaplama ---
+    function getBearing(lat1, lon1, lat2, lon2) {
+      const toRad = deg => deg * Math.PI / 180;
+      const toDeg = rad => rad * 180 / Math.PI;
+      const dLon = toRad(lon2 - lon1);
+      const y = Math.sin(dLon) * Math.cos(toRad(lat2));
+      const x = Math.cos(toRad(lat1)) * Math.sin(toRad(lat2)) -
+                Math.sin(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.cos(dLon);
+      let brng = Math.atan2(y, x);
+      brng = toDeg(brng);
+      return (brng + 360) % 360;
+    }
+
+    // --- Çizgi Layer Güncelle ---
+    function updateFlightPath() {
+      if (map && map.getSource('flight-path')) {
+        map.getSource('flight-path').setData({
+          type: 'Feature',
+          geometry: {
+            type: 'LineString',
+            coordinates: passedCoords
           }
         });
-        map.addLayer({
-          id: layerId,
-          type: 'line',
-          source: sourceId,
-          layout: {
-            'line-cap': 'round',
-            'line-join': 'round'
-          },
-          paint: {
-            'line-width': 4,
-            'line-color': [
-              'case',
-              ['has', 'color'],
-              ['get', 'color'],
-              '#d32f2f'
-            ]
-          }
-        });
       }
+    }
 
-      function computeBearing(start, end) {
-        const toRad = deg => deg * Math.PI / 180;
-        const toDeg = rad => rad * 180 / Math.PI;
-        const [lng1, lat1] = start.map(toRad);
-        const [lng2, lat2] = end.map(toRad);
-        const dLng = lng2 - lng1;
-        const y = Math.sin(dLng) * Math.cos(lat2);
-        const x =
-          Math.cos(lat1) * Math.sin(lat2) -
-          Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLng);
-        let brng = Math.atan2(y, x);
-        brng = toDeg(brng);
-        return (brng + 360) % 360;
-      }
+    // --- Kontrol Paneli Butonları ---
+    function setSpeed(newSpeed) {
+      speed = newSpeed;
+      document.getElementById('speed1Btn').classList.toggle('active', speed === 1);
+      document.getElementById('speed2Btn').classList.toggle('active', speed === 6);
+    }
+    document.getElementById('startBtn').onclick = function () {
+      if (!latArr.length) return;
+      if (moveTimeout) clearTimeout(moveTimeout);
+      setSpeed(1);
+      // Harita ve marker tekrar oluşturulmaz, sadece konumlar güncellenir
+      initializeMapAndMarker();
+      isPaused = false;
+      currentIndex = 0;
+      setTimeout(() => {
+        moveMarkerByEpoch();
+      }, 0);
+    };
+    document.getElementById('stopBtn').onclick = function () {
+      isPaused = true;
+      if (moveTimeout) clearTimeout(moveTimeout);
+    };
+    document.getElementById('continueBtn').onclick = function () {
+      if (!isPaused) return;
+      isPaused = false;
+      moveMarkerByEpoch();
+    };
+    document.getElementById('restartBtn').onclick = function () {
+      if (!latArr.length) return;
+      if (moveTimeout) clearTimeout(moveTimeout);
+      setSpeed(1);
+      initializeMapAndMarker();
+      isPaused = false;
+      currentIndex = 0;
+      setTimeout(() => {
+        moveMarkerByEpoch();
+      }, 800);
+    };
+    document.getElementById('speed1Btn').onclick = function () { setSpeed(1); };
+    document.getElementById('speed2Btn').onclick = function () { setSpeed(6); };
 
-      function interpolateLatLng(start, end, t) {
-        const lat = start[1] + (end[1] - start[1]) * t;
-        const lng = start[0] + (end[0] - start[0]) * t;
-        return [lng, lat];
-      }
+    // --- Timer Güncelle ---
+    function updateTimerInfo(idx) {
+      if (!epochArr.length) return;
+      const epoch = epochArr[idx];
+      const date = new Date(epoch * 1000);
+      document.getElementById('timer-value').innerText = date.toLocaleString('tr-TR');
+    }
 
-      function updateTemperatureInfo(idx) {
-        const tempObj = getTemperatureForIndex(idx);
-        document.getElementById('temperature-value').innerText = tempObj.value;
-        document.getElementById('temperature-value').style.color = tempObj.color;
-      }
-
-      function resetMarkers() {
-        currentIndex1 = 0;
-        currentIndex2 = 0;
-        segmentStart1 = null;
-        segmentStart2 = null;
-        segmentBearing1 = 0;
-        segmentBearing2 = 0;
-        passedCoords1 = [pathCoordinates1[0]];
-        passedCoords2 = [pathCoordinates2[0]];
-        marker1.setLngLat(pathCoordinates1[0]);
-        marker1.setRotation(computeBearing(pathCoordinates1[0], pathCoordinates1[1]) - 90);
-        marker2.setLngLat(pathCoordinates2[0]);
-        marker2.setRotation(computeBearing(pathCoordinates2[0], pathCoordinates2[1]) - 30);
-        updatePassedLine(1);
-        updatePassedLine(2);
-        updateTemperatureInfo(0);
-      }
-
-      function animateStep(timestamp) {
-        if (isPaused) {
-          pausedTimestamp = timestamp;
-          return;
-        }
-
-        // Marker 1
-        if (segmentStart1 === null) {
-          segmentStart1 = timestamp;
-          if (currentIndex1 < totalPoints1 - 1) {
-            segmentBearing1 = computeBearing(
-              pathCoordinates1[currentIndex1],
-              pathCoordinates1[currentIndex1 + 1]
-            );
-            marker1.setRotation(segmentBearing1 - 90);
-            updateTemperatureInfo(currentIndex1);
-          }
-        }
-        const segmentDuration = 800 / speed;
-        const elapsed1 = timestamp - segmentStart1;
-        const t1 = Math.min(elapsed1 / segmentDuration, 1);
-
-        if (currentIndex1 < totalPoints1 - 1) {
-          const from1 = pathCoordinates1[currentIndex1];
-          const to1 = pathCoordinates1[currentIndex1 + 1];
-          const [lng1, lat1] = interpolateLatLng(from1, to1, t1);
-          marker1.setLngLat([lng1, lat1]);
-          if (t1 === 1) {
-            passedCoords1.push([lng1, lat1]);
-            updatePassedLine(1);
-          } else if (passedCoords1.length === 1) {
-            updatePassedLine(1);
-          }
-        }
-
-        // Marker 2
-        if (segmentStart2 === null) {
-          segmentStart2 = timestamp;
-          if (currentIndex2 < totalPoints2 - 1) {
-            segmentBearing2 = computeBearing(
-              pathCoordinates2[currentIndex2],
-              pathCoordinates2[currentIndex2 + 1]
-            );
-            marker2.setRotation(segmentBearing2 - 30);
-          }
-        }
-        const elapsed2 = timestamp - segmentStart2;
-        const t2 = Math.min(elapsed2 / segmentDuration, 1);
-
-        if (currentIndex2 < totalPoints2 - 1) {
-          const from2 = pathCoordinates2[currentIndex2];
-          const to2 = pathCoordinates2[currentIndex2 + 1];
-          const [lng2, lat2] = interpolateLatLng(from2, to2, t2);
-          marker2.setLngLat([lng2, lat2]);
-          if (t2 === 1) {
-            passedCoords2.push([lng2, lat2]);
-            updatePassedLine(2);
-          } else if (passedCoords2.length === 1) {
-            updatePassedLine(2);
-          }
-        }
-
-        // İlerlet
-        let next = false;
-        if (t1 === 1 && currentIndex1 < totalPoints1 - 1) {
-          currentIndex1++;
-          segmentStart1 = null;
-          next = true;
-        }
-        if (t2 === 1 && currentIndex2 < totalPoints2 - 1) {
-          currentIndex2++;
-          segmentStart2 = null;
-          next = true;
-        }
-
-        // Sıcaklık bilgisini marker1 üzerinden gösteriyoruz (isteğe göre marker2'ye göre de ayarlanabilir)
-        updateTemperatureInfo(currentIndex1);
-
-        if (currentIndex1 < totalPoints1 - 1 || currentIndex2 < totalPoints2 - 1) {
-          animationFrameId = requestAnimationFrame(animateStep);
-        } else {
-          animationFrameId = null;
-        }
-      }
-
-      function setSpeed(newSpeed) {
-        speed = newSpeed;
-        document.getElementById('speed1Btn').classList.toggle('active', speed === 1);
-        document.getElementById('speed2Btn').classList.toggle('active', speed === 2);
-      }
-
-      map.on('load', () => {
-        addPassedLineLayer(1);
-        addPassedLineLayer(2);
-
-        // Marker 1
-        img1 = document.createElement("img");
-        img1.src = './airplane.png';
-        img1.className = 'airplane-marker';
-        marker1 = new maplibregl.Marker({
-            element: img1,
-            rotationAlignment: 'map'
-          })
-          .setLngLat(pathCoordinates1[0])
-          .addTo(map);
-
-        // Marker 2
-        img2 = document.createElement("img");
-        img2.src = './airplane2.png';
-        img2.className = 'airplane2-marker';
-        marker2 = new maplibregl.Marker({
-            element: img2,
-            rotationAlignment: 'map'
-          })
-          .setLngLat(pathCoordinates2[0])
-          .addTo(map);
-
-        // Buton işlevleri
-        document.getElementById('startBtn').onclick = function () {
-          if (animationFrameId) cancelAnimationFrame(animationFrameId);
-          setSpeed(1);
-          resetMarkers();
-          isPaused = false;
-          animationFrameId = requestAnimationFrame(animateStep);
-        };
-
-        document.getElementById('stopBtn').onclick = function () {
-          isPaused = true;
-        };
-
-        document.getElementById('continueBtn').onclick = function () {
-          if (!isPaused) return;
-          isPaused = false;
-          if (pausedTimestamp !== null) {
-            segmentStart1 += performance.now() - pausedTimestamp;
-            segmentStart2 += performance.now() - pausedTimestamp;
-            pausedTimestamp = null;
-          }
-          animationFrameId = requestAnimationFrame(animateStep);
-        };
-
-        document.getElementById('restartBtn').onclick = function () {
-          if (animationFrameId) cancelAnimationFrame(animationFrameId);
-          setSpeed(1);
-          resetMarkers();
-          isPaused = false;
-          animationFrameId = requestAnimationFrame(animateStep);
-        };
-
-        document.getElementById('speed1Btn').onclick = function () {
-          setSpeed(1);
-        };
-        document.getElementById('speed2Btn').onclick = function () {
-          setSpeed(2);
-        };
-
-        // Başlangıçta marker'ları sıfırla
-        setSpeed(1);
-        resetMarkers();
+    // --- Tauri ile tam ekran açılış ---
+    if (window.__TAURI__) {
+      window.__TAURI__.window.appWindow.setFullscreen(true);
+    } else if (window.tauri && window.tauri.window) {
+      window.tauri.window.appWindow.setFullscreen(true);
+    }
+  </script>
+  <script type="module">
+    // Tauri pencere API'sini asenkron olarak yükle ve tam ekran yap
+    if (window.__TAURI__) {
+      import('@tauri-apps/api/window').then(({ appWindow }) => {
+        appWindow.setFullscreen(true);
       });
-    });
+    }
   </script>
 </body>
 
