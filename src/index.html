@@ -25,11 +25,47 @@
       user-select: none;
       display: block;
     }
+
+    .controls {
+      position: absolute;
+      top: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+      padding: 10px 20px;
+      display: flex;
+      gap: 10px;
+    }
+
+    .controls button {
+      padding: 6px 16px;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      background: #f7f7f7;
+      font-size: 15px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .controls button:active {
+      background: #1976d2;
+      color: #fff;
+      border-color: #1976d2;
+    }
   </style>
 </head>
 
 <body>
   <div id="map"></div>
+  <div class="controls">
+    <button id="startBtn">Start</button>
+    <button id="stopBtn">Stop</button>
+    <button id="continueBtn">Continue</button>
+    <button id="restartBtn">Restart</button>
+  </div>
   <script>
     document.addEventListener("DOMContentLoaded", () => {
       const map = new maplibregl.Map({
@@ -50,14 +86,22 @@
       ];
       const totalPoints = pathCoordinates.length;
 
+      let marker, img;
+      let currentIndex = 0;
+      let segmentStart = null;
+      let segmentBearing = 0;
+      let animationFrameId = null;
+      let isPaused = false;
+      let pausedTimestamp = null;
+
       map.on('load', () => {
         // Marker için img oluştur
-        const img = document.createElement("img");
+        img = document.createElement("img");
         img.src = './airplane.png';
         img.className = 'airplane-marker';
 
         // Marker'ı oluştur
-        const marker = new maplibregl.Marker({
+        marker = new maplibregl.Marker({
             element: img,
             rotationAlignment: 'map'
           })
@@ -87,11 +131,19 @@
           return [lng, lat];
         }
 
-        let currentIndex = 0;
-        let segmentStart = null;
-        let segmentBearing = 0;
+        function resetMarker() {
+          currentIndex = 0;
+          segmentStart = null;
+          segmentBearing = 0;
+          marker.setLngLat(pathCoordinates[0]);
+          marker.setRotation(computeBearing(pathCoordinates[0], pathCoordinates[1]) - 90);
+        }
 
         function animateStep(timestamp) {
+          if (isPaused) {
+            pausedTimestamp = timestamp;
+            return;
+          }
           if (segmentStart === null) {
             segmentStart = timestamp;
             // Sadece segment başında bearing hesapla
@@ -108,6 +160,7 @@
           const t = Math.min(elapsed / segmentDuration, 1);
 
           if (currentIndex >= totalPoints - 1) {
+            animationFrameId = null;
             return;
           }
 
@@ -116,18 +169,48 @@
 
           const [lng, lat] = interpolateLatLng(from, to, t);
           marker.setLngLat([lng, lat]);
-          // marker.setRotation(segmentBearing - 90); // Sadece segment başında ayarlandı
 
           if (t < 1) {
-            requestAnimationFrame(animateStep);
+            animationFrameId = requestAnimationFrame(animateStep);
           } else {
             currentIndex++;
             segmentStart = null;
-            requestAnimationFrame(animateStep);
+            animationFrameId = requestAnimationFrame(animateStep);
           }
         }
 
-        requestAnimationFrame(animateStep);
+        // Buton işlevleri
+        document.getElementById('startBtn').onclick = function() {
+          if (animationFrameId) cancelAnimationFrame(animationFrameId);
+          resetMarker();
+          isPaused = false;
+          animationFrameId = requestAnimationFrame(animateStep);
+        };
+
+        document.getElementById('stopBtn').onclick = function() {
+          isPaused = true;
+        };
+
+        document.getElementById('continueBtn').onclick = function() {
+          if (!isPaused) return;
+          isPaused = false;
+          // segmentStart'ı pause edilen zamana göre ayarla
+          if (pausedTimestamp !== null) {
+            segmentStart += performance.now() - pausedTimestamp;
+            pausedTimestamp = null;
+          }
+          animationFrameId = requestAnimationFrame(animateStep);
+        };
+
+        document.getElementById('restartBtn').onclick = function() {
+          if (animationFrameId) cancelAnimationFrame(animationFrameId);
+          resetMarker();
+          isPaused = false;
+          animationFrameId = requestAnimationFrame(animateStep);
+        };
+
+        // Başlangıçta marker'ı sıfırla
+        resetMarker();
       });
     });
   </script>
